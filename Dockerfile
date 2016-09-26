@@ -63,7 +63,13 @@ RUN echo "HostKey /data/ssh/ssh_host_rsa_key" >> /etc/ssh/sshd_config && \
 ENV GOGS_CUSTOM /data/gogs
 RUN echo "export GOGS_CUSTOM=/data/gogs" >> /etc/profile
 
-RUN chown -R redis /var/log/redis
+# set up redis
+RUN mkdir /var/log/redis && \
+	chown -R redis /var/log/redis && \
+	chown -R redis /var/db/redis/ && \
+	sed -i -e \
+		's#logfile .*#logfile "/var/log/redis/redis-server.log"#' \
+		/etc/redis.conf
 
 COPY setup.sh /setup.sh
 RUN chmod +x /setup.sh
