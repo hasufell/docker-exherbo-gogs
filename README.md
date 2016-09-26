@@ -9,8 +9,8 @@
 
 Just pull them:
 ```sh
-docker pull hasufell/gentoo-gogs
-docker pull hasufell/gentoo-nginx-proxy
+docker pull hasufell/exherbo-gogs
+docker pull hasufell/exherbo-nginx-proxy
 ```
 
 ## Configuration
@@ -41,7 +41,7 @@ You should not remove it (keep in mind that this container is not running).
 docker run \
 	--name=gogs-volumes \
 	-v /data \
-	hasufell/gentoo-gogs \
+	hasufell/exherbo-gogs \
 	echo gogs-volumes
 ```
 
@@ -52,7 +52,7 @@ docker run -ti -d \
 	-v <full-path-to-nginx-certs>:/etc/nginx/certs \
 	-p 80:80 \
 	-p 443:443 \
-	hasufell/gentoo-nginx-proxy
+	hasufell/exherbo-nginx-proxy
 ```
 
 Now we can start the gogs instance.
@@ -65,7 +65,7 @@ docker run -ti -d \
 	-e VIRTUAL_PORT=3000 \
 	-e GOGS_SSH_PORT=<ssh-port> \
 	-p <sshport>:<sshport> \
-	hasufell/gentoo-gogs
+	hasufell/exherbo-gogs
 ```
 
 Note that `VIRTUAL_HOST` and `VIRTUAL_PORT` are __strictly__ necessary,
@@ -84,7 +84,7 @@ Make sure:
 ```sh
 docker stop gogs
 docker rm gogs
-docker pull hasufell/gentoo-gogs
+docker pull hasufell/exherbo-gogs
 docker run -ti -d \
 	--volumes-from gogs-volumes \
 	--name=gogs \
@@ -92,5 +92,5 @@ docker run -ti -d \
 	-e VIRTUAL_PORT=3000 \
 	-e GOGS_SSH_PORT=<ssh-port> \
 	-p <sshport>:<sshport> \
-	hasufell/gentoo-gogs
+	hasufell/exherbo-gogs
 ```
