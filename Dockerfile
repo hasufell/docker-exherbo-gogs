@@ -67,8 +67,9 @@ RUN echo "export GOGS_CUSTOM=/data/gogs" >> /etc/profile
 RUN mkdir /var/log/redis && \
 	chown -R redis /var/log/redis && \
 	chown -R redis /var/db/redis/ && \
-	sed -i -e \
-		's#logfile .*#logfile "/var/log/redis/redis-server.log"#' \
+	sed -i \
+		-e 's#^logfile .*#logfile "/var/log/redis/redis-server.log"#' \
+		-e 's#^dir .*#dir /var/db/redis/#' \
 		/etc/redis.conf
 
 COPY setup.sh /setup.sh
