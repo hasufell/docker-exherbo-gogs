@@ -1,23 +1,32 @@
-FROM        hasufell/gentoo-amd64-paludis:latest
-MAINTAINER  Julian Ospald <hasufell@gentoo.org>
+FROM       hasufell/exherbo:latest
+MAINTAINER Julian Ospald <hasufell@posteo.de>
+
+
+COPY ./config/paludis /etc/paludis
+COPY ./config/repositories /var/db/paludis/repositories
 
 
 ##### PACKAGE INSTALLATION #####
 
-# copy paludis config
-COPY ./config/paludis /etc/paludis
+RUN chgrp paludisbuild /dev/tty && \
+	eclectic env update && \
+	source /etc/profile && \
+	cave sync && \
+	cave resolve -z -1 repository/CleverCloud -x && \
+	cave resolve -z -1 repository/hasufell -x && \
+	cave resolve -z -1 repository/python -x && \
+	cave resolve -z -1 dev-lang/go -x && \
+	rm /etc/paludis/options.conf.d/bootstrap.conf && \
+	cave resolve -c world -x && \
+	cave resolve -c gogs -x && \
+	cave resolve -c tools -x && \
+	cave purge -x && \
+	cave fix-linkage -x && \
+	rm -rf /var/cache/paludis/distfiles/* \
+		/var/tmp/paludis/build/*
 
-# update world with our USE flags
-RUN chgrp paludisbuild /dev/tty && cave resolve -c world -x
+RUN eclectic config accept-all
 
-# install gogs dependencies
-RUN chgrp paludisbuild /dev/tty && cave resolve -c gogs -x
-
-# install tools set
-RUN chgrp paludisbuild /dev/tty && cave resolve -c tools -x
-
-# update etc files... hope this doesn't screw up
-RUN etc-update --automode -5
 
 ################################
 

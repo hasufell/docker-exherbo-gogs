@@ -1,0 +1,139 @@
+# Copyright 2013 NAKAMURA Yoshitaka
+# Copyright 2015 Kylie McClain <somasis@exherbo.org>
+# Distributed under the terms of the GNU General Public License v2
+
+SUMMARY="The Go Programming Language"
+HOMEPAGE="https://golang.org"
+
+LICENCES="BSD-3"
+SLOT="0"
+PLATFORMS="~amd64"
+
+MYOPTIONS="
+    bootstrap   [[ description = [ Bootstrap the Go toolchain from official binaries ] ]]
+    platform: amd64
+"
+
+DOWNLOADS="
+    https://storage.googleapis.com/golang/${PN}${PV}.src.tar.gz
+    bootstrap? (
+        platform:amd64? ( https://storage.googleapis.com/golang/${PN}${PV}.linux-amd64.tar.gz )
+    )
+"
+
+DEPENDENCIES="
+    build:
+        !bootstrap? ( dev-lang/go )
+"
+
+# strip - restricted because dwarf_compress can cause go to run into strange segfaults
+# test  - causes sydbox to hit invalid pointer errors
+RESTRICT="strip test"
+
+DEFAULT_SRC_INSTALL_EXTRA_DOCS=( PATENTS )
+
+pkg_setup() {
+    case "$(exhost --target)" in
+        x86_64-pc-linux-gnu)
+            export go_platform=linux-amd64
+            export go_linker=/usr/$(exhost --target)/lib/ld-linux-x86-64.so.2
+        ;;
+        x86_64-pc-linux-musl)
+            export go_platform=linux-amd64
+            export go_linker=/usr/$(exhost --target)/lib/ld-musl-x86_64.so.1
+        ;;
+        *)
+            die "Your target isn't supported by the exheres yet. Please submit a patch adding support."
+        ;;
+    esac
+}
+
+src_unpack() {
+    unpack "${PN}${PV}.src.tar.gz"
+    edo mv "${WORKBASE}"/${PN} "${WORKBASE}"/${PNV}
+    if option bootstrap;then
+        unpack "${PN}${PV}.${go_platform}.tar.gz"
+        edo mv "${WORKBASE}"/${PN} "${WORKBASE}"/${PN}-bootstrap
+        edo mv "${WORKBASE}"/${PN}-bootstrap/{,real}bin
+    fi
+}
+
+src_prepare() {
+    default
+
+    # we have to make shims because it seems like there's no way to fix
+    # go's build system in a way that doesn't require extensive patching...
+    edo mkdir shims
+    for tool in ar;do
+        edo ln -s /usr/$(exhost --target)/bin/$(exhost --tool-prefix)${tool} shims/${tool}
+    done
+
+    edo sed -e "s/pkg-config/${PKG_CONFIG}/g" -i src/cmd/go/build.go
+
+    if option bootstrap;then
+        # go's official bootstrap binaries don't expect the linker location we have
+        edo mkdir "${WORKBASE}"/${PN}-bootstrap/bin
+        for tool in "${WORKBASE}"/${PN}-bootstrap/realbin/*;do
+            printf '#!/bin/sh\nexec %s %s $@' "${go_linker}" "${tool}" > "${WORKBASE}"/${PN}-bootstrap/bin/${tool##*/}
+            chmod +x "${WORKBASE}"/${PN}-bootstrap/bin/${tool##*/}
+        done
+    fi
+
+}
+
+src_compile() {
+    export PATH="${PWD}/shims:${PATH}"
+    export GOROOT_FINAL=/usr/$(exhost --target)/lib/go
+    export GO_LDFLAGS="-linkmode external"
+
+    if option bootstrap;then
+        edo cd "${WORKBASE}"/${PNV}/src
+        edo env GOROOT_BOOTSTRAP="${WORKBASE}"/${PN}-bootstrap ./make.bash
+    else
+        edo cd "${WORKBASE}"/${PNV}/src
+        if [[ -x "/usr/$(exhost --target)/lib/go/bin/go" ]];then
+            edo env GOROOT_BOOTSTRAP=/usr/$(exhost --target)/lib/go ./make.bash
+        # this elif statement is needed to fix upgrading straight from 1.4.2.
+        # since the GOROOT layout was changed when it was upgraded to 1.5.
+        elif [[ -x "/usr/$(exhost --target)/bin/go" ]];then
+            edo mkdir "${WORK}"/bootstrap
+            edo pushd "${WORK}"/bootstrap
+            for dir in /usr/$(exhost --target)/lib/go/{doc,include,lib,pkg,src};do
+                edo ln -s "${dir}" ./
+            done
+            edo ln -s /usr/$(exhost --target)/bin ./
+            edo popd
+            edo env GOROOT_BOOTSTRAP="${WORK}/bootstrap" ./make.bash
+        else
+            die "Can't find already-installed Go compiler."
+        fi
+    fi
+}
+
+src_test() {
+    cd src
+    edo env GOROOT="${WORKBASE}"/${PNV} PATH="${WORK}/bin:${PATH}" ./run.bash --no-rebuild
+}
+
+src_install() {
+    edo mkdir -p "${IMAGE}"/usr/$(exhost --target)/{lib/go,bin}
+    edo cp -rp api bin lib pkg src "${IMAGE}"/usr/$(exhost --target)/lib/go
+    edo chown -R root:root "${IMAGE}"/usr
+
+    for bin in "${IMAGE}"/usr/$(exhost --target)/lib/go/bin/*;do
+        dosym /usr/$(exhost --target)/lib/go/bin/${bin##*/} /usr/$(exhost --target)/bin/${bin##*/}
+    done
+
+    edo mkdir -p "${IMAGE}"/usr/share/doc/${PNVR}
+    dosym /usr/$(exhost --target)/lib/go/doc /usr/share/doc/${PNVR}/doc
+    dosym /usr/$(exhost --target)/lib/go/api /usr/share/doc/${PNVR}/api
+
+    # XXX: remove testdata, which hit cave fix-linkage
+    edo rm "${IMAGE}"/usr/$(exhost --target)/lib/go/src/debug/elf/testdata/gcc-386-freebsd-exec
+
+    edo rm -rf "${IMAGE}"/usr/$(exhost --target)/lib/go/pkg/linux_*/internal/syscall/windows
+    edo rm -rf "${IMAGE}"/usr/$(exhost --target)/lib/go/pkg/obj/linux_*
+    edo rmdir "${IMAGE}"/usr/$(exhost --target)/lib/go/pkg/obj
+
+    emagicdocs
+}
