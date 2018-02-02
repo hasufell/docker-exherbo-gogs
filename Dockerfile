@@ -17,11 +17,12 @@ RUN chgrp paludisbuild /dev/tty && \
 	cave resolve -z -1 repository/python -x && \
 	cave resolve -z -1 dev-lang/go -x && \
 	rm /etc/paludis/options.conf.d/bootstrap.conf && \
-	cave resolve -c world -x && \
-	cave resolve -c gogs -x && \
-	cave resolve -c tools -x && \
+	cave resolve -c world -x -f --without sys-apps/paludis && \
+	cave resolve -c world -x --without sys-apps/paludis && \
+	cave resolve -c gogs -x --without sys-apps/paludis && \
+	cave resolve -c tools -x --without sys-apps/paludis && \
 	cave purge -x && \
-	cave fix-linkage -x && \
+	cave fix-linkage -x -- --without sys-apps/paludis && \
 	rm -rf /var/cache/paludis/distfiles/* \
 		/var/tmp/paludis/build/*
 
